@@ -1,0 +1,59 @@
+# ---- Build output ----------------------------------------------------------
+# Compiled binaries and debug symbols. The .pdb files are ~17 MB each and embed
+# absolute build paths from whoever compiled them, so they never belong in git.
+usermode/release/
+usermode/release_new/
+usermode/release_perf/
+usermode/release_perf2/
+usermode/out/
+usermode/x64/
+usermode/Debug/
+usermode/Release/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.user
+*.suo
+.vs/
+
+# ---- vcpkg -----------------------------------------------------------------
+usermode/vcpkg_installed/
+usermode/vcpkg_downloaded/
+usermode/vcpkg_scripts/
+usermode/vcpkg/
+vcpkg_installed/
+
+# ---- Node / frontend build -------------------------------------------------
+webapp/node_modules/
+webapp/dist/
+webapp/.vite/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# ---- Local machine config --------------------------------------------------
+# config.json holds the local server IP the usermode pushes data to. Tracked
+# config.json files are kept at localhost, but any per-machine variant that
+# points at a LAN address or a tunnel should never be committed.
+usermode/config.local.json
+config.local.json
+.env
+.env.local
+.env.*.local
+
+# ---- Logs / editor ---------------------------------------------------------
+*.log
+*.tmp
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- OS --------------------------------------------------------------------
+ehthumbs.db
+Desktop.ini

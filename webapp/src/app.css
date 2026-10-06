@@ -1,0 +1,279 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "TASAOrbiter";
+  src: url("./assets/typefaces/TASAOrbiterVF.woff2");
+}
+
+:root {
+  --text-primary: #b1d0e7;
+  --text-secondary: #6492b4;
+}
+
+* {
+  outline-offset: 4px;
+}
+
+body {
+  margin: 0;
+  font-family: "TASAOrbiter";
+  color: var(--text-primary);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.banner-link {
+  transition: all 0.35s ease-in-out;
+  box-shadow: 0px 1.5px 0 0 #1E3A54;
+  height: 20px;
+}
+
+.banner-link:hover {
+  box-shadow: 0px 2.5px 0 0 #1E3A54;
+}
+
+/* Map overlay buttons (live on the map, visible in fullscreen) */
+.map-ctl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(4, 10, 16, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #b1d0e7;
+  cursor: pointer;
+}
+
+.map-ctl-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.map-ctl-btn:active {
+  transform: scale(0.94);
+}
+
+/* Fullscreen the map only: keep it square, centered, fully visible */
+#radar-viewport:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  aspect-ratio: auto !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: #050d15 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#radar-viewport:fullscreen > #radar {
+  /* center the square map in the screen and scale it to fit height */
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: min(100vh, 100vw) !important;
+  height: min(100vh, 100vw) !important;
+  transform-origin: center center !important;
+  margin: 0 !important;
+}
+
+/* the JS applies rotate/scale on #radar, so shift via a wrapper offset instead */
+#radar-viewport:fullscreen > #radar {
+  translate: -50% -50%;
+  /* #radar carries an inline min-width:100% (of the viewport = 100vw). Without
+     this override the square box is stretched to full width, object-fit:contain
+     letterboxes the image inside it, and every dot (positioned from
+     img.offsetWidth) drifts off the map. */
+  min-width: 0 !important;
+}
+
+#radar-viewport:fullscreen > #radar > img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+#radar-viewport:fullscreen .map-ctl {
+  z-index: 9999 !important;
+}
+
+#radar-viewport:fullscreen .map-ctl-btn {
+  width: 38px !important;
+  height: 38px !important;
+  background: rgba(4, 10, 16, 0.9) !important;
+}
+
+
+
+#app-root:fullscreen {
+  background: #07141e;
+}
+
+@keyframes lowhp-pulse {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,0,0,0.8)); }
+  50% { filter: drop-shadow(0 0 8px rgba(255,0,0,1)); }
+}
+
+.lowhp-pulse {
+  animation: lowhp-pulse 1s infinite;
+}
+
+@keyframes bomb-flash {
+  0%, 100% { background-color: rgba(0,0,0,0.6); }
+  50% { background-color: rgba(255,0,0,0.35); }
+}
+
+.bomb-flash {
+  animation: bomb-flash 0.6s infinite;
+}
+
+/* C4 beacon ring - dropped / planted bomb on the radar */
+@keyframes bomb-beacon {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.75); opacity: 0.15; }
+}
+
+.bomb-beacon {
+  animation: bomb-beacon 1.1s ease-out infinite;
+}
+
+/* C4 badge on the carrier's radar dot */
+@keyframes bomb-carry-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(255,159,10,0.7); }
+  50% { box-shadow: 0 0 11px rgba(255,159,10,1); }
+}
+
+.bomb-carry {
+  animation: bomb-carry-glow 1.4s ease-in-out infinite;
+}
+
+/* Under-map summary: chips scroll horizontally instead of wrapping to a second
+   row (a second row pushed the square map and made the bar cover the map). */
+.summary-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.summary-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- Enemy summary bar (sits under the map) ------------------------------- */
+/* Soft raised panel: a light top edge fading into near-black, so it reads as a
+   separate control surface instead of a flat translucent rectangle. */
+.summary-shell {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.015) 45%, rgba(0, 0, 0, 0.28) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 6px 20px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+
+/* Left cap: a tiny pulsing threat pip + uppercase caption. Replaces the old bulky
+   "N alive" box, which the user asked to remove. */
+.summary-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+}
+
+.summary-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.summary-pip.hot {
+  background: #ff4d4d;
+  box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+  animation: summary-ping 1.6s ease-out infinite;
+}
+
+.summary-pip.clear {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
+}
+
+@keyframes summary-ping {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.65); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 77, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+}
+
+/* One place chip. Height and inset are fixed so the row never reflows as counts
+   change; only the colour ramp reacts, and it transitions smoothly. */
+.summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid;
+  white-space: nowrap;
+  line-height: 1;
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+
+.summary-chip-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.summary-chip-count {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Quiet fallback chip for enemies outside any named area. */
+.summary-chip.elsewhere {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Fade the strip edges when it overflows, so a scrolled-off chip does not just
+   get chopped mid-glyph against the panel border. */
+.summary-strip {
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
+}
+
