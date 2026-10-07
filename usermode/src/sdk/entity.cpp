@@ -71,7 +71,18 @@ const std::string c_entity_instance::get_schema_class_name()
 
 const std::string c_cs_player_pawn::get_model_name()
 {
-	const auto model_name = m_memory->read_t<uintptr_t>(m_pGameSceneNode() + SCHEMA_GET_OFFSET("CSkeletonInstance->m_modelState") + SCHEMA_GET_OFFSET("CModelState->m_ModelName"));
+	// m_pGameSceneNode() is null for a dead pawn. The old code added the schema
+	// offsets straight onto it - arithmetic on a null pointer, not a read of the
+	// field - which produced a garbage address and made this return "" even for
+	// LIVE players, so there was never anything available to cache.
+	// The offset math itself is left exactly as it was: it demonstrably produced
+	// correct model paths for living players.
+	const auto game_scene_node = m_pGameSceneNode();
+	if (!game_scene_node)
+		return {};
+
+	const auto model_name = m_memory->read_t<uintptr_t>(
+		game_scene_node + SCHEMA_GET_OFFSET("CSkeletonInstance->m_modelState") + SCHEMA_GET_OFFSET("CModelState->m_ModelName"));
 	if (!model_name)
 		return {};
 

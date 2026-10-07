@@ -1,4 +1,5 @@
 {
+    "_comment": "m_ip is where this program publishes. Keep 'localhost' for local use, or set your LAN address to serve other devices. m_secret must match what the bridge expects - CHANGE IT to anything private, because the value committed to a public repo is readable by anyone.",
     "m_ip": "localhost",
     "m_secret": "cs2situation-local-dev-secret"
 }

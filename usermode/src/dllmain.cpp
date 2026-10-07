@@ -8,12 +8,26 @@ bool main()
     INIT_STEP("interfaces", i::setup());
     INIT_STEP("schema", schema::setup());
 
+    // Warm the portrait cache from the previous run, so players who are already
+    // dead at startup still show a character instead of a blank placeholder.
+    f::players::load_model_cache();
+
     ix::initNetSystem();
     LOG_INFO("winsock initialization completed");
 
     // Must match the path the Node bridge listens on (webapp/ws/app.js) and the
     // URL the front end connects to (webapp/src/app.jsx). All three together.
     const auto formatted_address = std::format("ws://{}:22006/cs2situation", config_data.m_ip);
+
+    // The bridge authenticates each socket as a feed on its own connection, so the
+    // handshake has to be repeated on EVERY (re)connect. Sending it once before the
+    // tick loop meant that restarting the bridge silently killed the feed forever:
+    // the exe reconnected, was no longer flagged as the feed, and every tick was
+    // rejected as an unauthenticated publish.
+    const auto feed_auth = nlohmann::json{
+        { "type", "feed_auth" },
+        { "token", config_data.m_secret }
+    };
 
     static ix::WebSocket web_socket;
     std::mutex handshake_mutex;
@@ -32,6 +46,11 @@ bool main()
             }
             handshake_cv.notify_one();
             LOG_INFO("connected to the web socket ('%s')", formatted_address.c_str());
+
+            // Re-authenticate immediately. ixwebsocket reuses this socket object
+            // across reconnects, so this is what makes the feed survive a bridge
+            // restart instead of dying quietly.
+            web_socket.send(feed_auth.dump());
         }
         else if (msg->type == ix::WebSocketMessageType::Error)
         {
@@ -55,15 +74,6 @@ bool main()
         std::this_thread::sleep_for(std::chrono::seconds(5));
         return {};
     }
-
-    // Authenticate as the feed before publishing game data. The bridge drops
-    // messages from sockets that have not presented the secret, so only this
-    // process can push game state to viewers (a browser can never publish).
-    const auto feed_auth = nlohmann::json{
-        { "type", "feed_auth" },
-        { "token", config_data.m_secret }
-    };
-    web_socket.send(feed_auth.dump());
 
     for (;;)
     {

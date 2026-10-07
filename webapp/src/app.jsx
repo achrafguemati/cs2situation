@@ -51,8 +51,9 @@ const DEFAULT_SETTINGS = {
   mapFlipX: false,
   showLivePlace: true,
   showDroppedC4: true,
-  showPlantedC4: true,
-  showBombBadge: true,
+
+        showPlantedC4: true,
+        showBombBadge: true,
   autoFit: true,
   labelMode: "hover",
   dimTeammates: true,
@@ -92,6 +93,7 @@ const App = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrls, setShareUrls] = useState([]);
   const [lastMsg, setLastMsg] = useState(0);
+
   const [staleSec, setStaleSec] = useState(0);
   const aimBeepRef = useRef(null);
 
@@ -267,9 +269,12 @@ const App = () => {
         }
         if (!parsedData || typeof parsedData !== "object") return;
 
-        setPlayerArray(Array.isArray(parsedData.m_players) ? parsedData.m_players : []);
+        const players = Array.isArray(parsedData.m_players) ? parsedData.m_players : [];
+        setPlayerArray(players);
         setLocalTeam(typeof parsedData.m_local_team === "number" ? parsedData.m_local_team : 0);
-        setBombData(parsedData.m_bomb && typeof parsedData.m_bomb === "object" ? parsedData.m_bomb : null);
+
+        const incoming = parsedData.m_bomb && typeof parsedData.m_bomb === "object" ? parsedData.m_bomb : null;
+        setBombData(incoming);
         setLastMsg(Date.now());
 
         const map = typeof parsedData.m_map === "string" ? parsedData.m_map : "";
@@ -408,9 +413,9 @@ const App = () => {
           </div>
         )}
 
-        {bombData && bombData.m_blow_time > 0 && !bombData.m_is_defused && (
+        {(bombData && bombData.m_blow_time > 0 && !bombData.m_is_defused) && (
           <div className={`absolute left-1/2 -translate-x-1/2 top-11 flex-col items-center gap-1 z-50 pointer-events-none`}>
-            <BombTimer bombData={bombData} localHasKit={!!localPlayer?.m_has_defuser} />
+            <BombTimer bombData={bombData} localHasKit={!!localPlayer?.m_has_defuser} mapName={mapData?.name} mapData={mapData} />
           </div>
         )}
 

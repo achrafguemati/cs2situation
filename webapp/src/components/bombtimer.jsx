@@ -1,14 +1,42 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MaskedIcon from "./maskedicon";
+import { CALLOUTS } from "../utilities/callouts";
+import { getRadarPosition } from "../utilities/utilities";
 
-const BombTimer = ({ bombData, localHasKit }) => {
+// Which bombsite is the bomb on? Derived from the callout data we already ship
+// per map ("A Site" / "B Site"), so no extra game reads are needed.
+const SITE_RADIUS = 0.16;
+const getBombSite = (mapName, x, y) => {
+  const callouts = (mapName && CALLOUTS[mapName]) || [];
+
+  let best = null;
+  let bestDist = SITE_RADIUS;
+  for (const c of callouts) {
+    if (!/^[AB]\s*Site$/i.test(c.text)) continue;
+    const d = Math.hypot(x - c.x, y - c.y);
+    if (d <= bestDist) { bestDist = d; best = c; }
+  }
+
+  if (!best) return null;
+  return best.text.trim().charAt(0).toUpperCase();
+};
+
+const BombTimer = ({ bombData, localHasKit, mapName, mapData }) => {
   const lastSecRef = useRef(null);
   const beepedRef = useRef(false);
-
   const blow = bombData.m_blow_time || 0;
   const defuse = bombData.m_defuse_time || 0;
   const defusing = !!bombData.m_is_defusing;
   const defused = !!bombData.m_is_defused;
+
+  // Bomb coordinates are raw WORLD units; callouts live in 0..1 radar space, so the
+  // position has to be converted before comparing, never compared directly.
+  const site = bombData.m_state === `planted`
+    ? getBombSite(mapName, ...(() => {
+        const p = getRadarPosition(mapData, bombData);
+        return [p.x, p.y];
+      })())
+    : null;
 
   const secs = Math.ceil(blow);
   const kit = !!localHasKit;
@@ -37,6 +65,8 @@ const BombTimer = ({ bombData, localHasKit }) => {
       o.onended = () => ctx.close();
     } catch {}
   }, [secs, defusing, blow]);
+
+
 
   if (defused) {
     return (
@@ -85,6 +115,11 @@ const BombTimer = ({ bombData, localHasKit }) => {
           {blow.toFixed(1)}s
         </span>
       </div>
+      {/* Which site it is on - this one is a real read (the planted entity's
+          position), unlike the plant countdown that was removed. */}
+      {site && (
+        <span className="text-[10px] font-bold tracking-widest text-red-300/90">SITE {site}</span>
+      )}
       {kit && <span className="text-[10px] text-green-300/80">defuse {totalDefuse}s (kit)</span>}
     </div>
   );

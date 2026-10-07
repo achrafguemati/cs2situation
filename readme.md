@@ -114,10 +114,15 @@ The page shows "waiting for data" until the program is running and a match is lo
 `usermode/config.json`:
 
 ```json
-{ "m_ip": "localhost" }
+{
+    "m_ip": "localhost",
+    "m_secret": "cs2situation-local-dev-secret"
+}
 ```
 
-Keep `localhost` for local use. Set it to your LAN address to serve other devices — the bridge listens on port `22006`.
+Keep `m_ip` as `localhost` for local use. Set it to your LAN address to serve other devices — the bridge listens on port `22006`.
+
+**Change `m_secret` before you expose the bridge to a network.** It must match what the bridge expects, and the value above is published in this repo, so treat it as a placeholder. The program prints a warning at startup while the default is still in use.
 
 ---
 
@@ -145,6 +150,7 @@ A few things worth knowing if you read the code:
 
 - **Offsets are resolved at startup.** CS2 names its fields but doesn't hardcode where they sit, so `src/core/schema.hpp` hashes each field name and looks the address up once.
 - **Bomb carrier detection reads inventories.** The obvious way — matching the C4's owner handle to each player — fails intermittently for reasons that are hard to see. Instead it walks each player's weapons; if a C4 is in there, they have it.
+- **Dead players keep their portrait.** A dead pawn has no scene node, so the model name comes back empty. The program remembers name → model in a local cache file so portraits survive a round change, and warns if that file can't be written.
 - **Crash safety.** Game services can be null during menus and round transitions, so every pointer is checked before it's read.
 - **Performance.** Scanning the game binary for patterns is expensive, so it's throttled to once every 5 seconds instead of every tick — that alone was causing game stutter.
 - **Named areas cover 11 of the 17 maps.** On `cs_agency`, `de_cache`, `de_golden`, `de_grail`, `de_palacio`, and `de_train` the radar works but has no area names or threat chips.

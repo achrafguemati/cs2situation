@@ -1,10 +1,33 @@
 import { useRef } from "react";
 import { getRadarPosition } from "../utilities/utilities";
+import { CALLOUTS } from "../utilities/callouts";
+
+// Which bombsite is this position on? Derived from the callout data we already
+// ship per map ("A Site" / "B Site"), so it costs no extra game reads.
+const SITE_RADIUS = 0.16;
+const getBombSite = (mapName, x, y) => {
+  const callouts = (mapName && CALLOUTS[mapName]) || [];
+
+  let best = null;
+  let bestDist = SITE_RADIUS;
+  for (const c of callouts) {
+    if (!/^[AB]\s*Site$/i.test(c.text)) continue;
+    const d = Math.hypot(x - c.x, y - c.y);
+    if (d <= bestDist) { bestDist = d; best = c; }
+  }
+
+  if (!best) return null;
+  return best.text.trim().charAt(0).toUpperCase();
+};
 
 // Three visually distinct C4 markers driven by m_state:
 //   carried  - orange, sits on the carrier (hidden here when that dot is visible)
 //   dropped  - yellow, pulsing beacon so you spot the loose bomb
 //   planted  - red, flashing, pairs with the bomb timer panel
+//
+// There is deliberately NO "planting" state: CS2 exposes no plant-in-progress
+// field (measured - see usermode/src/features/bomb/bomb.cpp), so any such panel
+// would have to invent a countdown it cannot verify.
 const STATE_STYLE = {
   carried: { color: `#ff9f0a`, glow: `rgba(255,159,10,0.9)`, label: `C4` },
   dropped: { color: `#ffd60a`, glow: `rgba(255,214,10,0.9)`, label: `DROPPED` },
@@ -15,6 +38,9 @@ const Bomb = ({ bombData, mapData, radarImage, settings = {}, hideWhenCarried = 
   const bombRef = useRef();
 
   const state = bombData.m_state || `dropped`;
+  // "none" = no bomb entity at all this tick (round not started / ended). Must
+  // render nothing rather than fall through to the dropped style.
+  if (state === `none`) return null;
   if (state === `carried` && hideWhenCarried) return null;
   if (state === `dropped` && settings.showDroppedC4 === false) return null;
   if (state === `planted` && settings.showPlantedC4 === false) return null;
@@ -39,6 +65,13 @@ const Bomb = ({ bombData, mapData, radarImage, settings = {}, hideWhenCarried = 
   const color = defused ? `#50904c` : style.color;
   const glow = defused ? `rgba(80,144,76,0.9)` : style.glow;
   const beacon = state !== `carried`;
+
+  // Sites matter most once planted - that is the moment a defender
+  // needs to know which bombsite to rotate to.
+  const site = state === `planted`
+    ? getBombSite(mapData?.name, radarPosition.x, radarPosition.y)
+    : null;
+  const siteText = site ? ` ${site} SITE` : ``;
 
   return (
     <div
@@ -81,7 +114,7 @@ const Bomb = ({ bombData, mapData, radarImage, settings = {}, hideWhenCarried = 
             textShadow: `0 1px 3px #000, 0 0 6px rgba(0,0,0,0.9)`,
           }}
         >
-          {style.label}
+          {style.label}{siteText}
         </div>
       )}
     </div>

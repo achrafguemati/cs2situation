@@ -137,8 +137,9 @@ const SettingsButton = ({ settings, onSettingsChange }) => {
               <Toggle label="Show teammates" checked={settings.showTeammates} onChange={(v) => set({ showTeammates: v })} />
               <Toggle label="Show enemies" checked={settings.showEnemies} onChange={(v) => set({ showEnemies: v })} />
               <Toggle label="Show bomb" checked={settings.showBomb} onChange={(v) => set({ showBomb: v })} />
-              <Toggle label="Dropped C4 marker" checked={settings.showDroppedC4} onChange={(v) => set({ showDroppedC4: v })} />
-              <Toggle label="Planted C4 marker" checked={settings.showPlantedC4} onChange={(v) => set({ showPlantedC4: v })} />
+<Toggle label="Dropped C4 marker" checked={settings.showDroppedC4} onChange={(v) => set({ showDroppedC4: v })} />
+        
+        <Toggle label="Planted C4 marker" checked={settings.showPlantedC4} onChange={(v) => set({ showPlantedC4: v })} />
               <Toggle label="C4 badge on carrier" checked={settings.showBombBadge} onChange={(v) => set({ showBombBadge: v })} />
               <Toggle label="Side panels" checked={settings.showPanels} onChange={(v) => set({ showPanels: v })} />
               <Toggle label="Compact panels" checked={settings.compactPanels} onChange={(v) => set({ compactPanels: v })} />

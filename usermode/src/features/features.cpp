@@ -102,6 +102,15 @@ void f::get_player_info()
 	m_bomb_planted = false;
 	m_bomb_carried = false;
 
+	// Publish an explicit "no bomb" every tick. Without this, m_bomb is simply
+	// absent when no bomb entity exists, the frontend sets its state to null, and
+	// React then keeps rendering the LAST value it received - so a planted/defused
+	// marker from the previous round lingered on the map during the next one.
+	m_data["m_bomb"]["m_state"] = "none";
+	m_data["m_bomb"]["m_blow_time"] = 0;
+	m_data["m_bomb"]["m_is_defused"] = false;
+	m_data["m_bomb"]["m_is_defusing"] = false;
+
 	const auto highest_idx = 1024;
 	for (int32_t idx = 0; idx < highest_idx; idx++)
 	{
@@ -140,7 +149,7 @@ void f::get_player_info()
 		}
 		else if (hashed_class_name == fnv1a::hash("C_C4"))
 		{
-			f::bomb::get_carried_bomb(entity);
+			f::bomb::get_carried_bomb(reinterpret_cast<c_c4*>(entity));
 		}
 		else if (hashed_class_name == fnv1a::hash("C_PlantedC4"))
 		{
@@ -171,6 +180,9 @@ void f::get_player_info()
 		m_bomb_carried = true;
 	}
 
+	// "planting" was removed: measurement showed m_bBombPlanted flips at plant END
+	// (same tick C_PlantedC4 spawns) and no other field marks plant start, so the
+	// truthful states are none / carried / dropped / planted.
 	if (m_bomb_carried)
 	{
 		// The C4's own scene node trails the carrier, so it can be missing or stale.

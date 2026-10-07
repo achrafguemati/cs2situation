@@ -1,17 +1,43 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import MaskedIcon from "./maskedicon";
 import { playerColors, teamEnum, getRadarPosition } from "../utilities/utilities";
 import { CALLOUTS } from "../utilities/callouts";
 
+// player name -> last known character model. Survives pawn death and entity-slot
+// recycling, which is what keeps a dead player's portrait from disappearing.
+// Keyed by NAME, not m_steam_id: the backend sends m_steam_id as "0" for every
+// player in CS2, and "0" is a truthy string, so a steam-id key would collapse all
+// players onto one entry and hand them each other's faces.
+const lastKnownModels = new Map();
+
 const PlayerCard = ({ playerData, isOnRightSide, right, settings, followIdx, onFollow, viewAsIdx, mapData, localTeam }) => {
   const onRight = isOnRightSide ?? right ?? false;
   const compact = settings?.compactPanels !== false;
-  const [modelName, setModelName] = useState(playerData.m_model_name);
 
+  // A dead pawn has no scene node, so the backend sends an empty m_model_name.
+  // Remember the last one that worked. Entity slots (m_idx) get recycled on
+  // respawn, so a card can remount with a fresh pawn before it has reported a
+  // model - keying on m_idx would lose the portrait exactly when the player dies.
+  const playerKey = `${playerData.m_name || ""}|${playerData.m_team}`;
+  const modelName = useMemo(() => {
+    // CS2 swaps a dead pawn's model to the spectator rig. It is a real string,
+    // not an empty one, and there is no portrait for it - so it must never be
+    // cached or displayed, only the last genuine character model.
+    const live = playerData.m_model_name || "";
+    const usable = live && !live.startsWith("cs_observer");
+    if (usable) {
+      lastKnownModels.set(playerKey, live);
+      return live;
+    }
+    return lastKnownModels.get(playerKey) || "";
+  }, [playerKey, playerData.m_model_name]);
+
+  // Track images that 404 so a genuinely missing asset degrades to the fallback
+  // instead of a broken-image glyph.
+  const [imgBroken, setImgBroken] = useState(false);
   useEffect(() => {
-    if (playerData.m_model_name)
-      setModelName(playerData.m_model_name);
-  }, [playerData.m_model_name]);
+    setImgBroken(false);
+  }, [modelName]);
 
   const isLocal = viewAsIdx != null ? playerData.m_idx === viewAsIdx : !!playerData.m_is_local;
   const isFollowed = followIdx != null && playerData.m_idx === followIdx;
@@ -71,7 +97,7 @@ const PlayerCard = ({ playerData, isOnRightSide, right, settings, followIdx, onF
       onClick={handleFollow}
       title={isLocal ? `This is you` : isFollowed ? `Click to stop following` : `Click to follow ${playerData.m_name}`}
       style={{
-        opacity: `${(playerData.m_is_dead && `0.5`) || `1`}`,
+        opacity: `${(playerData.m_is_dead && `0.62`) || `1`}`,
         border: isLocal ? `1px solid #ffff00` : isFollowed ? `1px solid #00e5ff` : `1px solid transparent`,
         borderRadius: `6px`,
         background: isLocal ? `rgba(255,255,0,0.07)` : isFollowed ? `rgba(0,229,255,0.08)` : `transparent`,
@@ -101,11 +127,25 @@ const PlayerCard = ({ playerData, isOnRightSide, right, settings, followIdx, onF
             } transparent transparent transparent`,
           }}
         ></div>
-        <img
-          className={`${compact ? `h-10 xl:h-12` : `h-16 xl:h-20`} w-auto object-contain ${onRight && `scale-x-[-1]`}`}
-          src={`./assets/characters/${modelName}.png`}
-          loading="lazy"
-        ></img>
+        {modelName && !imgBroken ? (
+          <img
+            className={`${compact ? `h-10 xl:h-12` : `h-16 xl:h-20`} w-auto object-contain transition-opacity duration-200 ${onRight && `scale-x-[-1]`} ${playerData.m_is_dead ? `opacity-30` : `opacity-100`}`}
+            src={`./assets/characters/${modelName}.png`}
+            loading="lazy"
+            onError={() => setImgBroken(true)}
+            alt=""
+          />
+        ) : (
+          // No model name (dead pawn) or the asset 404s: show a neutral silhouette
+          // instead of the browser's broken-image glyph.
+          <div
+            className={`${compact ? `h-10 xl:h-12` : `h-16 xl:h-20`} w-10 xl:w-14 rounded-md border border-white/10 bg-white/[0.03] flex items-center justify-center transition-opacity duration-200 ${playerData.m_is_dead ? `opacity-35` : `opacity-60`}`}
+          >
+            <svg viewBox="0 0 24 24" className="w-1/2 h-1/2" fill="currentColor" style={{ color: `rgba(255,255,255,0.35)` }}>
+              <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.2 0-7.5 2.2-7.5 5v1.5h15V19c0-2.8-3.3-5-7.5-5Z" />
+            </svg>
+          </div>
+        )}
 
         {/* ENEMY SPOTTED - anchored to the OUTER edge of this player's card, so it
             stays on the player side and never overlaps the map radar.

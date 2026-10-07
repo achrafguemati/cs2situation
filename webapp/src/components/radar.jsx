@@ -115,7 +115,9 @@ const Radar = ({
     return settings.showTeammates !== false;
   };
 
-  // Hide the map-level bomb marker while the carrier's own dot already shows the C4.
+  // Hide the map-level bomb marker while the carrier's own dot already shows the C4,
+  // otherwise the standalone marker draws on top of the badge and you see two C4
+  // icons stacked at the same spot.
   const bombCarrier = bombData?.m_state === `carried`
     ? playerArray.find((p) => p.m_has_bomb && !p.m_is_dead)
     : null;

@@ -155,6 +155,15 @@ public:
 	f_vector get_vec_origin();
 };
 
+class c_c4 : public c_base_entity
+{
+public:
+	// No plant-in-progress field exists on C_C4 (measured, not guessed):
+	//   m_bBombPlanted  (8027) flips exactly when C_PlantedC4 spawns (plant END)
+	//   m_bStartedArming(7976) and m_fArmedTime(7980) change at round start
+	// Nothing is read here - carried / dropped / planted is the full truth set.
+};
+
 class c_planted_c4 : public c_base_entity
 {
 public:

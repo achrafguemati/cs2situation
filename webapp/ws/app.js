@@ -94,7 +94,15 @@ web_socket_server.on("connection", (web_socket, request) => {
                 web_socket.isFeed = true;
                 console.info(`${client_address} authenticated as feed`);
             } else {
-                console.warn(`${client_address} attempted to publish without the feed secret - ignored`);
+                // Rate-limit this. An unauthenticated sender retries at the full
+                // feed rate, which flooded the console and made real problems hard
+                // to spot. First few are logged, then summarised once.
+                web_socket.rejectCount = (web_socket.rejectCount || 0) + 1;
+                if (web_socket.rejectCount <= 3) {
+                    console.warn(`${client_address} attempted to publish without the feed secret - ignored`);
+                } else if (web_socket.rejectCount === 4) {
+                    console.warn(`${client_address} still unauthenticated - further attempts suppressed`);
+                }
             }
             return;
         }

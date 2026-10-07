@@ -1,10 +1,12 @@
 # ---- Build output ----------------------------------------------------------
 # Compiled binaries and debug symbols. The .pdb files are ~17 MB each and embed
 # absolute build paths from whoever compiled them, so they never belong in git.
-usermode/release/
-usermode/release_new/
-usermode/release_perf/
-usermode/release_perf2/
+#
+# Any usermode/release*/ directory is build output, whatever it is named. They used
+# to be listed one by one, which meant every new folder (release_probe, release_p4,
+# release_v3...) showed up as untracked until someone remembered to add it - and the
+# pile of near-identical exes made it easy to launch the wrong one.
+usermode/release*/
 usermode/out/
 usermode/x64/
 usermode/Debug/
@@ -42,6 +44,13 @@ config.local.json
 .env
 .env.local
 .env.*.local
+
+# ---- Runtime caches --------------------------------------------------------
+# models_cache.json is written by usermode at runtime: player name -> character
+# model, so a dead player's portrait survives a round change. It is per-machine
+# state, regenerated whenever the exe runs, and must never be committed.
+models_cache.json
+usermode/models_cache.json
 
 # ---- Logs / editor ---------------------------------------------------------
 *.log
