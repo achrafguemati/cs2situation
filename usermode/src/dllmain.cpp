@@ -56,6 +56,15 @@ bool main()
         return {};
     }
 
+    // Authenticate as the feed before publishing game data. The bridge drops
+    // messages from sockets that have not presented the secret, so only this
+    // process can push game state to viewers (a browser can never publish).
+    const auto feed_auth = nlohmann::json{
+        { "type", "feed_auth" },
+        { "token", config_data.m_secret }
+    };
+    web_socket.send(feed_auth.dump());
+
     for (;;)
     {
         sdk::update();

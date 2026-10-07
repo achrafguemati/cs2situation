@@ -1,3 +1,4 @@
 {
-    "m_ip": "localhost"
+    "m_ip": "localhost",
+    "m_secret": "cs2situation-local-dev-secret"
 }

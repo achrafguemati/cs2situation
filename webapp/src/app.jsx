@@ -11,6 +11,10 @@ const CONNECTION_TIMEOUT = 5000;
 
 const PORT = 22006;
 
+// Map metadata is static per map name; cache it so the 10 Hz feed does not
+// refetch the same JSON (and re-run every dependent effect) on every message.
+const mapDataCache = new Map();
+
 /* Auto-detect so the same build works locally, over LAN, and through a tunnel:
    - local:  http://localhost:5173      -> ws://localhost:22006
    - LAN:    http://192.168.x.x:5173    -> ws://192.168.x.x:22006
@@ -96,7 +100,7 @@ const App = () => {
   }, [viewAs]);
 
   useEffect(() => {
-    fetch("http://localhost:22006/ip")
+    fetch(`http://${WS_HOST}:${PORT}/ip`)
       .then((r) => r.json())
       .then((d) => setShareUrls(d.urls || []))
       .catch(() => setShareUrls([]));
@@ -254,20 +258,38 @@ const App = () => {
       };
 
       webSocket.onmessage = async (event) => {
-        const parsedData = JSON.parse(await event.data.text());
-        setPlayerArray(parsedData.m_players);
-        setLocalTeam(parsedData.m_local_team);
-        setBombData(parsedData.m_bomb);
+        let parsedData;
+        try {
+          parsedData = JSON.parse(await event.data.text());
+        } catch (error) {
+          console.error("ignoring malformed feed payload", error);
+          return;
+        }
+        if (!parsedData || typeof parsedData !== "object") return;
+
+        setPlayerArray(Array.isArray(parsedData.m_players) ? parsedData.m_players : []);
+        setLocalTeam(typeof parsedData.m_local_team === "number" ? parsedData.m_local_team : 0);
+        setBombData(parsedData.m_bomb && typeof parsedData.m_bomb === "object" ? parsedData.m_bomb : null);
         setLastMsg(Date.now());
 
-        const map = parsedData.m_map;
-        if (map !== "invalid") {
-          setMapData({
-            ...(await (await fetch(`data/${map}/data.json`)).json()),
-            name: map,
-          });
-          document.body.style.backgroundImage = `url(./data/${map}/background.png)`;
+        const map = typeof parsedData.m_map === "string" ? parsedData.m_map : "";
+        if (!map || map === "invalid") return;
+
+        let mapData = mapDataCache.get(map);
+        if (!mapData) {
+          try {
+            const response = await fetch(`data/${map}/data.json`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            mapData = { ...(await response.json()), name: map };
+            mapDataCache.set(map, mapData);
+          } catch (error) {
+            console.error(`failed to load map data for '${map}'`, error);
+            return;
+          }
         }
+
+        setMapData(mapData);
+        document.body.style.backgroundImage = `url(./data/${map}/background.png)`;
       };
     };
 

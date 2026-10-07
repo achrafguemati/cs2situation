@@ -3,8 +3,9 @@
 struct config_data_t
 {
 	std::string m_ip;
+	std::string m_secret;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(config_data_t, m_ip)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(config_data_t, m_ip, m_secret)
 };
 
 namespace cfg

@@ -1,16 +1,33 @@
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import os from "os";
 
 console.log("web_server started")
 
 const port = 22006;
+
+// Bind to loopback by default so the feed and its control channel are not
+// reachable from the network. Set CS2SITUATION_HOST=0.0.0.0 to share on LAN.
+// Only expose it on a trusted network, and pair it with a real feed secret.
+const host = process.env.CS2SITUATION_HOST || "127.0.0.1";
+
+// Secret the C++ feeder must present before it may publish game data. Browsers
+// connect as viewers only and can never publish. This is a DEV-ONLY default so
+// localhost works out of the box; set CS2SITUATION_FEED_SECRET (bridge) and
+// m_secret (usermode/config.json) to the same value before going on a network.
+const DEFAULT_FEED_SECRET = "cs2situation-local-dev-secret";
+const feed_secret = process.env.CS2SITUATION_FEED_SECRET || DEFAULT_FEED_SECRET;
+if (feed_secret === DEFAULT_FEED_SECRET) {
+    console.warn("WARNING: using the built-in dev feed secret. Anyone who can reach this port knows it. Set CS2SITUATION_FEED_SECRET (and m_secret in usermode/config.json) to a real value before exposing to a network.");
+}
+
 const server = http.createServer();
 const web_socket_server = new WebSocketServer(
     {
         // Must match the URL the C++ bridge dials (usermode/src/dllmain.cpp) and
         // the one the front end connects to (webapp/src/app.jsx).
-        server: server, path: "/cs2situation"
+        server: server, path: "/cs2situation",
+        maxPayload: 64 * 1024
     }
 );
 
@@ -29,14 +46,30 @@ for (const [name, infos] of Object.entries(os.networkInterfaces())) {
     }
 }
 
+// Only answer cross-origin requests from the origins we actually serve,
+// never "*".
+const allowed_origins = new Set([
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    ...lan_addresses.map((address) => `http://${address}:5173`),
+]);
+
 server.on("request", (request, response) => {
-    response.setHeader("Access-Control-Allow-Origin", "*");
+    const origin = request.headers.origin;
+    if (origin && allowed_origins.has(origin)) {
+        response.setHeader("Access-Control-Allow-Origin", origin);
+        response.setHeader("Vary", "Origin");
+    }
     response.setHeader("Content-Type", "application/json");
 
     if (request.url === "/ip") {
+        // Only advertise LAN URLs when the bridge is actually reachable from
+        // the network. Loopback-bound, sharing silently does not work, so do
+        // not hand the frontend URLs that would fail.
+        const exposed = host === "0.0.0.0";
         response.end(JSON.stringify({
-            addresses: lan_addresses,
-            urls: lan_addresses.map((address) => `http://${address}:5173`),
+            addresses: exposed ? lan_addresses : [],
+            urls: exposed ? lan_addresses.map((address) => `http://${address}:5173`) : [],
         }));
         return;
     }
@@ -45,12 +78,32 @@ server.on("request", (request, response) => {
 });
 
 web_socket_server.on("connection", (web_socket, request) => {
-    const client_address = request.socket.remoteAddress.replace("::ffff:", "");
+    const client_address = (request.socket.remoteAddress || "").replace("::ffff:", "");
     console.info(`${client_address} connected`);
 
+    // A socket may publish only after presenting the feed secret. Viewers never
+    // publish, so a browser cannot inject fake game state into every client.
+    web_socket.isFeed = false;
+
     web_socket.on("message", (message) => {
+        if (!web_socket.isFeed) {
+            // Unauthenticated sockets may only send the feed-auth handshake.
+            let parsed = null;
+            try { parsed = JSON.parse(message.toString()); } catch { /* not JSON - ignore */ }
+            if (parsed && parsed.type === "feed_auth" && parsed.token === feed_secret) {
+                web_socket.isFeed = true;
+                console.info(`${client_address} authenticated as feed`);
+            } else {
+                console.warn(`${client_address} attempted to publish without the feed secret - ignored`);
+            }
+            return;
+        }
+
+        // Authenticated feed: fan the raw payload out to every connected client.
         web_socket_server.clients.forEach((client) => {
-            client.send(message);
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
         });
     });
 
@@ -63,8 +116,8 @@ web_socket_server.on("connection", (web_socket, request) => {
     });
 });
 
-server.listen(port);
-console.info(`listening on port '${port}'`);
-if (lan_addresses.length) {
+server.listen(port, host);
+console.info(`listening on ${host}:${port}`);
+if (host === "0.0.0.0" && lan_addresses.length) {
     console.info(`open on other devices: http://${lan_addresses[0]}:5173`);
 }
