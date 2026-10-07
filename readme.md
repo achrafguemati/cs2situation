@@ -6,6 +6,8 @@ Shows every player on the map — where they are, which way they're looking, who
 
 > **Study project.** Built to learn how CS2 stores its data in memory. It only **reads** game memory — nothing is written, injected, or hooked.
 
+![The radar interface — team panels either side, live map in the centre, threat bar underneath](docs/screenshot.png)
+
 ---
 
 ## How it works
