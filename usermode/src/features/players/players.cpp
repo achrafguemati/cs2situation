@@ -1,5 +1,23 @@
 #include "pch.hpp"
 
+namespace
+{
+	// Weapon data names come from the game as "weapon_ak47" and the frontend
+	// looks up assets/icons/<name>.svg, so the prefix has to go.
+	// The previous erase(begin(), begin() + 7) was unguarded: any name shorter
+	// than 7 characters made it throw std::out_of_range, uncaught, mid-tick.
+	// Only strip the prefix when it is actually there, which also keeps names
+	// that do not carry it intact.
+	std::string strip_weapon_prefix(std::string name)
+	{
+		constexpr std::string_view prefix = "weapon_";
+		if (name.starts_with(prefix))
+			name.erase(0, prefix.size());
+
+		return name;
+	}
+} // namespace
+
 bool f::players::get_data(int32_t idx, c_cs_player_controller* player, c_cs_player_pawn* player_pawn)
 {
 	const auto health = player_pawn->m_iHealth();
@@ -64,11 +82,9 @@ void f::players::get_weapons(c_cs_player_pawn* player_pawn)
 		if (!weapon_data)
 			continue;
 
-		auto weapon_name = weapon_data->m_szName();
+		auto weapon_name = strip_weapon_prefix(weapon_data->m_szName());
 		if (weapon_name.empty())
 			continue;
-
-		weapon_name.erase(weapon_name.begin(), weapon_name.begin() + 7);
 
 		const auto weapon_type = weapon_data->m_WeaponType();
 		switch (weapon_type)
@@ -124,11 +140,9 @@ void f::players::get_active_weapon(c_cs_player_pawn* player_pawn)
 	if (!weapon_data)
 		return;
 
-	auto weapon_name = weapon_data->m_szName();
+	auto weapon_name = strip_weapon_prefix(weapon_data->m_szName());
 	if (weapon_name.empty())
 		return;
-
-	weapon_name.erase(weapon_name.begin(), weapon_name.begin() + 7);
 
 	m_player_data["m_weapons"]["m_active"] = weapon_name;
 }

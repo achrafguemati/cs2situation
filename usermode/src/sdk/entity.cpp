@@ -1,4 +1,23 @@
 #include "pch.hpp"
+#include <cstdio>
+
+namespace
+{
+	// A null address here means either the signature was not found (no dereference
+	// at all, so no UB) or its target pointer read back as 0.
+	// Callers already treat a null result as "no local player".
+	uintptr_t resolve_local_player_controller()
+	{
+		const auto result = m_memory->find_pattern(CLIENT_DLL, GET_LOCAL_PLAYER_CONTROLLER);
+		if (!result.has_value())
+		{
+			printf(" [error] signature '%s' not found in '%s'\n", GET_LOCAL_PLAYER_CONTROLLER, CLIENT_DLL);
+			return 0;
+		}
+
+		return result->rip().as<uintptr_t>();
+	}
+} // namespace
 
 const c_base_handle c_entity_instance::get_ref_e_handle()
 {
@@ -60,12 +79,23 @@ const std::string c_cs_player_pawn::get_model_name()
 	if (model_path.empty())
 		return {};
 
-	return model_path.substr(model_path.rfind("/") + 1, model_path.rfind(".") - model_path.rfind("/") - 1);
+	// rfind returns npos when the delimiter is missing; the old arithmetic then
+	// underflowed size_t and passed a huge length to substr, which throws
+	// std::out_of_range. Derive the last component from first principles instead.
+	const auto slash_index = model_path.rfind('/');
+	const auto file_name = (slash_index == std::string::npos) ? model_path : model_path.substr(slash_index + 1);
+
+	const auto extension_index = file_name.rfind('.');
+	const auto stem = (extension_index == std::string::npos) ? file_name : file_name.substr(0, extension_index);
+
+	// The caller treats this as a path component (assets/characters/<name>.png).
+	// Never return an empty one, or it would request "characters/.png".
+	return stem.empty() ? std::string("unknown") : stem;
 }
 
 c_cs_player_controller* c_cs_player_controller::get_local_player_controller()
 {
-	static auto offset = m_memory->find_pattern(CLIENT_DLL, GET_LOCAL_PLAYER_CONTROLLER)->rip().as<void*>();
+	static const auto offset = resolve_local_player_controller();
 	if (!offset)
 		return {};
 
