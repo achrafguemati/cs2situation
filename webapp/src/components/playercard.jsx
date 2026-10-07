@@ -209,10 +209,28 @@ const PlayerCard = ({ playerData, isOnRightSide, right, settings, followIdx, onF
         )}
 
         {compact ? (
-          <div className={`flex ${onRight && `flex-row-reverse`} gap-1 items-center text-[10px] opacity-80 truncate`}>
-            <span className="truncate">{playerData.m_weapons?.m_primary || playerData.m_weapons?.m_secondary || ''}</span>
-            {playerData.m_team == teamEnum.counterTerrorist && playerData.m_has_defuser && <span>🔧</span>}
-            {playerData.m_team == teamEnum.terrorist && playerData.m_has_bomb && <span>💣</span>}
+          /* Compact mode: weapon ICONS, not the name text. The 80 icons already ship
+             in assets/icons, so this costs no extra reads and no new assets - you
+             just read the shape instead of the word. Active weapon is brightened,
+             the other one dimmed, matching the full-size layout. */
+          <div className={`flex ${onRight && `flex-row-reverse`} gap-1 items-center`}>
+            {playerData.m_weapons?.m_primary && (
+              <MaskedIcon path={`./assets/icons/${playerData.m_weapons.m_primary}.svg`} height={16}
+                title={`${playerData.m_weapons.m_primary}${playerData.m_weapons.m_active == playerData.m_weapons.m_primary ? ` (active)` : ``}`}
+                color={`${(playerData.m_weapons.m_active == playerData.m_weapons.m_primary && `bg-radar-primary`) || `bg-radar-secondary`}`} />
+            )}
+            {playerData.m_weapons?.m_secondary && (
+              <MaskedIcon path={`./assets/icons/${playerData.m_weapons.m_secondary}.svg`} height={16}
+                title={`${playerData.m_weapons.m_secondary}${playerData.m_weapons.m_active == playerData.m_weapons.m_secondary ? ` (active)` : ``}`}
+                color={`${(playerData.m_weapons.m_active == playerData.m_weapons.m_secondary && `bg-radar-primary`) || `bg-radar-secondary`}`} />
+            )}
+            {playerData.m_team == teamEnum.counterTerrorist && playerData.m_has_defuser && (
+              <MaskedIcon path={`./assets/icons/defuser.svg`} height={16} title={`Has defuser`} color={`bg-radar-secondary`} />
+            )}
+            {playerData.m_team == teamEnum.terrorist && playerData.m_has_bomb && (
+              <MaskedIcon path={`./assets/icons/c4.svg`} height={16} title={`Has the C4`}
+                color={`${playerData.m_weapons?.m_active == `c4` ? `bg-radar-primary` : `bg-radar-secondary`}`} />
+            )}
           </div>
         ) : (
         <div className={`flex flex-col relative`}>

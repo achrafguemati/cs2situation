@@ -1,0 +1,3 @@
+{
+	"_comment": "Optional per-map spawn rotation override, in degrees. Only needed if the automatic measurement gets a map wrong (it reads the spawn axis from live player positions at round start). A value here wins over the measured one. Omit a map entirely to let it measure. Common values: 0, 90, 180, 270."
+}

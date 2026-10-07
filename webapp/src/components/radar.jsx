@@ -4,6 +4,31 @@ import Bomb from "./bomb";
 import { getRadarPosition } from "../utilities/utilities";
 import { CALLOUTS } from "../utilities/callouts";
 
+// Per-map spawn-side rotation. A flat "T = 0 / CT = 180" rule is wrong on maps whose
+// spawns do not sit opposite each other, and the map textures carry only x/y/scale -
+// no spawn positions - so nothing can be hardcoded reliably for all 17 maps.
+//
+// Instead it is MEASURED from live data (see measureSpawnRotation inside the
+// component): at the start of a round every living player stands in their own spawn,
+// so the vector between the two team centroids IS the spawn axis. Rotating by that
+// puts our spawn at the bottom. Cached per map+team.
+//
+// Manual override lives in data/spawn_rotation.json - an entry there wins:
+//   { "de_nuke": { "spawnSideRot": 90 } }
+const spawnRotation = {};
+
+// Plain promise, NOT a hook - module scope is correct here.
+let spawnRotationLoad = null;
+const loadSpawnRotation = () => {
+  if (!spawnRotationLoad) {
+    spawnRotationLoad = fetch("./data/spawn_rotation.json")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d) => Object.assign(spawnRotation, d))
+      .catch(() => {});
+  }
+  return spawnRotationLoad;
+};
+
 const Radar = ({
   playerArray,
   radarImage,
@@ -53,6 +78,68 @@ const Radar = ({
   const hasValidFocus = focusPos && !(focusPos.x <= 0 && focusPos.y <= 0);
   // Fixed manual rotation (not auto). Set once to match your radar orientation.
   const fixedRot = settings.mapFixedRot || 0;
+
+  // Spawn-side rotation: keeps YOUR spawn at the bottom of the radar, whichever
+  // team you are on, and follows you automatically when you switch sides
+  // (halftime, or picking a player on the other team in "I am").
+  //
+  // STATIC flip based on team, not view-angle following: it only changes when your
+  // team changes, so dots never spin around. The angle is per map - spawns are not
+  // opposite on every map - and comes from data/spawn_rotation.json.
+  // Measure the spawn axis from live data. Works only while players are actually
+  // in their spawns (round start), which is why it is cached per map+team - the
+  // first successful measurement sticks and costs nothing afterwards.
+  const measureSpawnRotation = () => {
+    if (!mapData?.name || (localTeam !== 2 && localTeam !== 3)) return 0;
+
+    const key = `${mapData.name}|${localTeam}`;
+    if (spawnRotation[key] !== undefined) return spawnRotation[key];
+
+    const mine = [];
+    const theirs = [];
+    for (const p of playerArray) {
+      if (p.m_is_dead) continue;
+      const pos = getRadarPosition(mapData, p.m_position);
+      if (!pos || (pos.x <= 0 && pos.y <= 0)) continue;
+      (p.m_team === localTeam ? mine : theirs).push(pos);
+    }
+
+    // Need players on both sides, and the two groups must be genuinely apart.
+    // Mid-round everybody is scattered, so this only succeeds near round start.
+    if (mine.length < 2 || theirs.length < 2) return 0;
+
+    const avg = (list) => ({
+      x: list.reduce((s, p) => s + p.x, 0) / list.length,
+      y: list.reduce((s, p) => s + p.y, 0) / list.length,
+    });
+    const a = avg(mine);
+    const b = avg(theirs);
+
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    if (Math.hypot(dx, dy) < 0.15) return 0;
+
+    // Angle that turns our spawn direction to point DOWN (+y) on the radar.
+    // CSS rotate() is clockwise-positive and y grows downward, hence atan2(dx, dy).
+    // Snapped to 90 degree steps because real spawn axes are axis-aligned.
+    const deg = (Math.atan2(dx, dy) * 180) / Math.PI;
+    const snapped = (((Math.round(deg / 90) * 90) % 360) + 360) % 360;
+
+    spawnRotation[key] = snapped;
+    return snapped;
+  };
+
+  // Manual override from data/spawn_rotation.json wins over the measured value.
+  const perMapRot = spawnRotation[mapData?.name]?.spawnSideRot ?? measureSpawnRotation();
+  const teamSpawnRot = settings.spawnSideRotate === false ? 0 : perMapRot;
+  const totalRot = (fixedRot + teamSpawnRot) % 360;
+
+  // Kick off the override lookup from inside the component. The data arrives after
+  // first paint, so bump a counter to re-render once it lands.
+  const [, setSpawnRotLoaded] = useState(0);
+  useEffect(() => {
+    loadSpawnRotation().then(() => setSpawnRotLoaded((n) => n + 1));
+  }, []);
   const flipX = !!settings.mapFlipX;
   const mapRot = 0;
   const rotOrigin = `center`;
@@ -242,7 +329,7 @@ const Radar = ({
         style={{
           width: `${zoom * 100}%`,
           minWidth: `100%`,
-          transform: `${flipX ? `scaleX(-1) ` : ``}${fixedRot ? `rotate(${fixedRot}deg) ` : ``}${fitScale !== 1 ? `scale(${fitScale})` : ``}`.trim() || `none`,
+          transform: `${flipX ? `scaleX(-1) ` : ``}${totalRot ? `rotate(${totalRot}deg) ` : ``}${fitScale !== 1 ? `scale(${fitScale})` : ``}`.trim() || `none`,
           transformOrigin: fitScale !== 1 ? fitOrigin : `center`,
           transition: `transform 200ms linear`,
         }}
@@ -261,7 +348,7 @@ const Radar = ({
             style={{
               left: `${c.x * 100}%`,
               top: `${c.y * 100}%`,
-              transform: `translate(-50%,-50%) rotate(${-fixedRot}deg) scaleX(${flipX ? -1 : 1})`,
+              transform: `translate(-50%,-50%) rotate(${-totalRot}deg) scaleX(${flipX ? -1 : 1})`,
               fontSize: `0.52vw`,
               fontWeight: 600,
               letterSpacing: `0.14em`,
@@ -340,7 +427,7 @@ const Radar = ({
             settings={settings}
             isFollowed={followIdx != null && player.m_idx === followIdx}
             onFollow={onFollow}
-            fixedRot={fixedRot}
+            fixedRot={totalRot}
             flipX={flipX}
             labelStack={stackIdx.get(player.m_idx) || 0}
             isAimingAtMe={!!aimingIds?.includes(player.m_idx)}

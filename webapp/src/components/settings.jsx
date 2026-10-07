@@ -34,8 +34,9 @@ const SettingsButton = ({ settings, onSettingsChange }) => {
       autoFit: true,
       radarOpacity: 1,
       dotSize: 1.3,
-      mapFixedRot: 0,
-      mapFlipX: false,
+mapFixedRot: 0,
+        mapFlipX: false,
+        spawnSideRotate: true,
     });
   };
 
@@ -161,6 +162,8 @@ const SettingsButton = ({ settings, onSettingsChange }) => {
                 />
               </div>
               <Toggle label="Mirror map (flip)" checked={settings.mapFlipX} onChange={(v) => set({ mapFlipX: v })} />
+              <Toggle label="Rotate so your spawn is at the bottom" checked={settings.spawnSideRotate}
+                onChange={(v) => set({ spawnSideRotate: v })} />
             </div>
 
             <div className="border-t border-white/10 pt-2 space-y-1">

@@ -1,4 +1,11 @@
 export const getRadarPosition = (mapData, entityCoords) => {
+  // Both args can legitimately be missing: mapData is undefined until the map
+  // data.json loads, and callers may have no coords. Dereferencing either threw a
+  // TypeError that took the whole React tree down, so guard up front.
+  if (!mapData || !entityCoords) {
+    return { x: 0, y: 0 };
+  }
+
   if (!entityCoords.x || !entityCoords.y) {
     return { x: 0, y: 0 };
   }

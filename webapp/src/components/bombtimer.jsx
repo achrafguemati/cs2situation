@@ -30,13 +30,14 @@ const BombTimer = ({ bombData, localHasKit, mapName, mapData }) => {
   const defused = !!bombData.m_is_defused;
 
   // Bomb coordinates are raw WORLD units; callouts live in 0..1 radar space, so the
-  // position has to be converted before comparing, never compared directly.
-  const site = bombData.m_state === `planted`
-    ? getBombSite(mapName, ...(() => {
-        const p = getRadarPosition(mapData, bombData);
-        return [p.x, p.y];
-      })())
-    : null;
+  // position has to be converted before comparing, never compared directly. A
+  // {0,0} fallback means "unknown", so don't report a site off it.
+  const site = (() => {
+    if (bombData.m_state !== `planted`) return null;
+    const p = getRadarPosition(mapData, bombData);
+    if (!p || (p.x <= 0 && p.y <= 0)) return null;
+    return getBombSite(mapName, p.x, p.y);
+  })();
 
   const secs = Math.ceil(blow);
   const kit = !!localHasKit;
