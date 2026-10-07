@@ -110,6 +110,16 @@ std::pair<std::optional<uintptr_t>, std::optional<uintptr_t>> c_memory::get_modu
 	if (snapshot == INVALID_HANDLE_VALUE)
 		return {};
 
+	// RAII: the success path used to `return` straight out of the loop below, which
+	// skipped CloseHandle and leaked one handle per call. get_map() retries every 5s
+	// on the map-fallback path, so that leaked steadily. Closing here covers every
+	// exit path, including a future early return.
+	struct handle_guard
+	{
+		HANDLE handle;
+		~handle_guard() { if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle); }
+	} const guard{ snapshot };
+
 	MODULEENTRY32 module_entry = { 0 };
 	module_entry.dwSize = sizeof(module_entry);
 

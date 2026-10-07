@@ -77,9 +77,37 @@ bool main()
 
     for (;;)
     {
-        sdk::update();
-        f::run();
-        web_socket.send(f::m_data.dump());
+        // One bad read must not end the session. Reads themselves cannot throw
+        // (ReadProcessMemory fails cleanly), but string and container work on
+        // game-supplied data can throw std::out_of_range / bad_alloc - and an
+        // uncaught exception here would terminate usermode.exe mid-tick, which is
+        // exactly the crash class this program is supposed to survive.
+        //
+        // Identical throws are logged once rather than 10x a second.
+        try
+        {
+            sdk::update();
+            f::run();
+            web_socket.send(f::m_data.dump());
+        }
+        catch (const std::exception& e)
+        {
+            static std::string last_error;
+            if (last_error != e.what())
+            {
+                last_error = e.what();
+                LOG_ERROR("tick failed, recovered: %s", e.what());
+            }
+        }
+        catch (...)
+        {
+            static bool reported = false;
+            if (!reported)
+            {
+                reported = true;
+                LOG_ERROR("tick failed with an unknown exception, recovered");
+            }
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }

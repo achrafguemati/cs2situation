@@ -1,5 +1,7 @@
 #include "pch.hpp"
 
+#include <unordered_set>
+
 struct schema_data_t
 {
 	fnv1a_t m_hashed_field_name = 0;
@@ -60,6 +62,21 @@ uint32_t schema::get_offset(const fnv1a_t hashed_field_name)
 	it != m_schema_data.end())
 		return it->m_offset;
 
-	LOG_ERROR("failed to find an offset for the field with the hash value '%d'", hashed_field_name);
+	// Log each missing field ONCE per session, not 10x a second. This function is
+	// called from inside the per-tick entity walk, so a field that no longer exists
+	// (after a CS2 update) used to flood the console and bury every real message.
+	//
+	// Note the returned 0 is indistinguishable from a legitimate offset 0, which is
+	// why nothing may rely on an unverified field name - a wrong name reads
+	// unrelated memory instead of failing loudly. Verified field names only.
+	static std::mutex warned_mutex;
+	static std::unordered_set<fnv1a_t> warned_fields;
+
+	{
+		std::lock_guard lock(warned_mutex);
+		if (warned_fields.insert(hashed_field_name).second)
+			LOG_ERROR("failed to find an offset for the field with the hash value '%llu' (logged once; this field is now unreadable)", static_cast<unsigned long long>(hashed_field_name));
+	}
+
 	return {};
 }
